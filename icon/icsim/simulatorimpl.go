@@ -44,7 +44,7 @@ func newWorldState(wss state.WorldSnapshot, readonly bool) state.WorldState {
 
 type transactionImpl struct {
 	txType TxType
-	args []interface{}
+	args   []interface{}
 }
 
 func (t *transactionImpl) Type() TxType {
@@ -61,7 +61,8 @@ func NewTransaction(txType TxType, args []interface{}) Transaction {
 
 // ==========================================================
 
-type emptyConsensusInfoMaker struct {}
+type emptyConsensusInfoMaker struct{}
+
 var emptyConsensusInfo = common.NewConsensusInfo(nil, nil, nil)
 
 func (maker *emptyConsensusInfoMaker) Run(
@@ -73,13 +74,13 @@ func (maker *emptyConsensusInfoMaker) Run(
 
 type simulatorImpl struct {
 	config *config
-	plt platform
+	plt    platform
 	logger log.Logger
 
 	blockHeight int64
-	revision module.Revision
-	stepPrice *big.Int
-	wss state.WorldSnapshot
+	revision    module.Revision
+	stepPrice   *big.Int
+	wss         state.WorldSnapshot
 	revHandlers map[int]func(wc state.WorldState, r1, r2 int) error
 }
 
@@ -124,9 +125,9 @@ func (sim *simulatorImpl) init(validators []module.Validator, balances map[strin
 
 func (sim *simulatorImpl) initRevHandler() {
 	sim.revHandlers = map[int]func(wc state.WorldState, r1, r2 int) error{
-		icmodule.Revision5: sim.handleRev5,
-		icmodule.Revision6: sim.handleRev6,
-		icmodule.Revision9: sim.handleRev9,
+		icmodule.Revision5:  sim.handleRev5,
+		icmodule.Revision6:  sim.handleRev6,
+		icmodule.Revision9:  sim.handleRev9,
 		icmodule.Revision10: sim.handleRev10,
 		icmodule.Revision14: sim.handleRev14,
 		icmodule.Revision15: sim.handleRev15,
@@ -236,6 +237,10 @@ func (sim *simulatorImpl) Go(blocks int64, csi module.ConsensusInfo) error {
 	wss := sim.wss
 	blockHeight := sim.blockHeight
 
+	//if csi == nil {
+	//	csi = sim.newDefaultConsensusInfo()
+	//}
+
 	for i := int64(0); i < blocks; i++ {
 		blockHeight++
 
@@ -337,10 +342,24 @@ func (sim *simulatorImpl) GoByTransaction(tx Transaction, csi module.ConsensusIn
 	return sim.GoByBlock(block, csi)
 }
 
+func (sim *simulatorImpl) newDefaultConsensusInfo() module.ConsensusInfo {
+	vl := sim.ValidatorList()
+	vss, err := state.ValidatorSnapshotFromSlice(sim.Database(), vl)
+	if err != nil {
+		return nil
+	}
+	v, _ := vss.Get(vss.Len() - 1)
+	voted := make([]bool, vss.Len())
+	for i := 0; i < len(voted); i++ {
+		voted[i] = true
+	}
+	return common.NewConsensusInfo(v.Address(), vss, voted)
+}
+
 func (sim *simulatorImpl) executeTx(csi module.ConsensusInfo, ws state.WorldState, tx Transaction) error {
 	var err error
 	revision := sim.revision
-	wc := NewWorldContext(ws, sim.blockHeight + 1, revision, csi, sim.stepPrice)
+	wc := NewWorldContext(ws, sim.blockHeight+1, revision, csi, sim.stepPrice)
 	es := wc.GetExtensionState().(*iiss.ExtensionStateImpl)
 
 	switch tx.Type() {
@@ -538,6 +557,11 @@ func (sim *simulatorImpl) TermSnapshot() *icstate.TermSnapshot {
 	return es.State.GetTermSnapshot()
 }
 
+func (sim *simulatorImpl) GetAccountSnapshot(address module.Address) *icstate.AccountSnapshot {
+	es := sim.getExtensionState(true)
+	return es.State.GetAccountSnapshot(address)
+}
+
 func (sim *simulatorImpl) ValidatorList() []module.Validator {
 	vss := sim.wss.GetValidatorSnapshot()
 	size := vss.Len()
@@ -553,11 +577,11 @@ func NewSimulator(
 	revision module.Revision, initValidators []module.Validator, initBalances map[string]*big.Int, config *config,
 ) Simulator {
 	sim := &simulatorImpl{
-		logger: log.GlobalLogger(),
+		logger:      log.GlobalLogger(),
 		blockHeight: 0,
-		revision: revision,
-		stepPrice: icmodule.BigIntZero,
-		config: config,
+		revision:    revision,
+		stepPrice:   icmodule.BigIntZero,
+		config:      config,
 	}
 	if err := sim.init(initValidators, initBalances); err != nil {
 		return nil

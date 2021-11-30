@@ -71,6 +71,15 @@ func initEnv(t *testing.T, c *config, revision module.Revision) *Env {
 		assert.Zero(t, prep.GetVFail(blockHeight))
 		assert.Zero(t, prep.GetVFailCont(blockHeight))
 	}
+
+	totalBond := new(big.Int)
+	for _, bonder := range env.bonders {
+		ass := sim.GetAccountSnapshot(bonder)
+		for _, bond := range ass.Bonds() {
+			totalBond.Add(totalBond, bond.Amount())
+		}
+	}
+	assert.Zero(t, totalBond.Cmp(sim.TotalBond()))
 	return env
 }
 
@@ -104,6 +113,56 @@ func assertPower(t *testing.T, p map[string]interface{}) bool {
 	assert.True(t, ok)
 	assert.True(t, power.Sign() >= 0)
 	return true
+}
+
+func assertBondsOfPRep(t *testing.T, sim Simulator, address module.Address) {
+	jso := sim.GetBonderList(address)
+	bonders := jso["bonderList"].([]interface{})
+	bonderAddrs := make([]module.Address, len(bonders))
+
+	for i, bonder := range bonders {
+		b, ok := bonder.(module.Address)
+		assert.True(t, ok)
+		bonderAddrs[i] = b
+	}
+
+	totalBond := new(big.Int)
+	for _, addr := range bonderAddrs {
+		jso = sim.GetBond(addr)
+		bonds := jso["bonds"].([]interface{})
+		for _, bond := range bonds {
+			b, ok := bond.(map[string]interface{})
+			assert.True(t, ok)
+			prepAddr := b["address"].(module.Address)
+			if address.Equal(prepAddr) {
+				totalBond.Add(totalBond, b["value"].(*common.HexInt).Value())
+				break
+			}
+		}
+	}
+	bonded := sim.GetPRep(address).Bonded()
+	assert.Zero(t, bonded.Cmp(totalBond))
+}
+
+func assertBondsOfPReps(t *testing.T, sim Simulator, addresses []module.Address) {
+	for i := range addresses {
+		assertBondsOfPRep(t, sim, addresses[i])
+	}
+}
+
+func assertBondsOfUser(t *testing.T, sim Simulator, user module.Address) {
+	jso := sim.GetBond(user)
+	totalBond, ok := GetFromJSO(jso, "totalBonded").(*big.Int)
+	assert.True(t, ok)
+
+	sumOfBonds := new(big.Int)
+	bonds := jso["bonds"].([]interface{})
+	for _, bond := range bonds {
+		b, ok := bond.(map[string]interface{})
+		assert.True(t, ok)
+		sumOfBonds.Add(sumOfBonds, b["value"].(*common.HexInt).Value())
+	}
+	assert.Zero(t, totalBond.Cmp(sumOfBonds))
 }
 
 func TestSimulator_CandidateIsPenalized(t *testing.T) {

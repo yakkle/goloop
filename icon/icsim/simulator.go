@@ -82,6 +82,7 @@ type Simulator interface {
 	GetPReps() map[string]interface{}
 	GetNetworkInfo() map[string]interface{}
 	TermSnapshot() *icstate.TermSnapshot
+	GetAccountSnapshot(address module.Address) *icstate.AccountSnapshot
 
 	Go(blocks int64, csi module.ConsensusInfo) error
 	GoTo(blockHeight int64, csi module.ConsensusInfo) error
