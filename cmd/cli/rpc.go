@@ -192,6 +192,13 @@ func NewRpcCmd(parentCmd *cobra.Command, parentVc *viper.Viper) (*cobra.Command,
 				ToAddress:   jsonrpc.Address(cmd.Flag("to").Value.String()),
 				DataType:    "call", //refer server/v3/validation.go:27 isCall
 			}
+			if h := cmd.Flag("height").Value.String(); h != "" {
+				height, err := intconv.ParseInt(h, 64)
+				if err != nil {
+					return err
+				}
+				param.Height = jsonrpc.HexInt(intconv.FormatInt(height))
+			}
 
 			dataM := make(map[string]interface{})
 			if dataJson := cmd.Flag("raw").Value.String(); dataJson != "" {
@@ -237,6 +244,7 @@ func NewRpcCmd(parentCmd *cobra.Command, parentVc *viper.Viper) (*cobra.Command,
 	callFlags.StringToString("param", nil,
 		"key=value, Function parameters, if '--raw' used, will overwrite")
 	callFlags.String("raw", "", "call with 'data' using raw json file or json-string")
+	callFlags.String("height", "", "Block height")
 	MarkAnnotationRequired(callFlags, "to")
 
 	rawCmd := &cobra.Command{
